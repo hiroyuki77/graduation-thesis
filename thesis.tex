@@ -128,18 +128,19 @@
 　唐突な電源断が発生したり， OS にバグが発生したりすると， file system の一貫性が失われてしまう．この問題を crash-consistency problem という．本来，保存してあるデータは永続的なものであるべきである．そこで，この問題を解決するために生み出されたものが， journaling file system である．本章では， ext4 file system において，デフォルトで用いられている， metadata journaling について説明する．
 \subsection{journaling の意味}
 　本来，データは永続的なものであるべきである。しかし，データを変更する途中で，電源断が発生したり OS にバグが発生したりして，変更が中断されてしまう場合が存在する．この場合，復帰する際に特別な操作を行わないと， file system に矛盾が生じてしまう．簡単な書き込みを例に，途中でクラッシュが起こってしまった場合にどうなるかを紹介する．書き込み例は，すでに存在するファイルに対して，データブロックを一つ加えるもので，ファイルを開く，正しいオフセットの位置まで移動する， 4KB の write を発行する，ファイルを閉じるの 4 つの操作からなる．\\
-　書き込み対象の file system も標準的な， inode bitmap, data bitmap, inodes, data blocks を含んでいるものとする．初期状態を図\ref{fig:data1}に示す．
+　書き込み対象の file system も標準的な， inode bitmap， data bitmap， inodes， data blocks を含んでいるものとする．データ構造の初期状態を図\ref{fig:data1}に示す．inode bitmap Ba は，inode I[v1] が使用中であることを示している．data bitmap B[v1] は，data block Da が使用中であることを示している．inode I[v1] は，file size が 1 であり，ファイルの内容がブロック 4 ，つまり data block Da に格納されていることを示している．data block Da は，ファイルの内容を格納している．\\
 \begin{figure}[H]
 	\begin{center}
-		\includegraphics[width=2.0cm]{images/isolation.png}
-		\caption{初期状態}
+		\includegraphics[width=15.0cm,clip]{images/data1.pdf}
+		\caption{初期のデータ構造}
 		\label{fig:data1}
 	\end{center}
 \end{figure}
-　また， inode の中身は以下のようになっているとする．
-\begin{table}[htb]
+　また， inode I[v1]の中身は表\ref{tab:inode1}のようになっているとする．\\
+%　この直後の表が来ないため，形を整える必要があるかもしれない．
+\begin{table}[h]
 	\begin{center}
-%	\caption{inode の初期状態}
+	\caption{inode の初期状態}
 		\begin{tabular}{lcl}
 			owner & : & hoge \\
 			permissions & : & read-write \\
@@ -151,7 +152,41 @@
 		\end{tabular}
 		\label{tab:inode1}
 	\end{center}
-\end{table}	
+\end{table}
+　1 ブロック分が割り当てられているので file size は 1, pointer はブロック 4 を指している．ここに，簡単な書き込み操作を行うと， data bitmap， inode， data block の 3 箇所が更新される．data block では，新しく data block Db が，ファイルに割り当てられる．inode I[v1] の pointer が，元々割り当てられている data block Da 以外に，新しく割り当てられた data block Db も指すようになり，file size は 2 となる．さらに， 新しく data bitmap B[v2] が， data block Db が使用されていることを指し示すようにする．無事，書き込み操作が行われた場合， inode I[v1] は表\ref{tab:inode2}のようなる．\\
+\begin{table}[h]
+	\begin{center}
+	\caption{inode の書き込み操作終了後の状態}
+		\begin{tabular}{lcl}
+			owner & : & hoge \\
+			permissions & : & read-write \\
+			size & : & 2 \\
+			pointer & : & 4 \\
+			pointer & : & 5 \\
+			pointer & : & null \\
+			pointer & : & null
+		\end{tabular}
+		\label{tab:inode2}
+	\end{center}
+\end{table}
+　さらに，書き込み操作終了後のデータ構造は図\ref{fig:data2}のようになる．\\
+\begin{figure}[H]
+	\begin{center}
+		\includegraphics[width=15.0cm,clip]{images/data2.pdf}
+		\caption{書き込み終了後のデータ構造}
+		\label{fig:data2}
+	\end{center}
+\end{figure}
+　上記で述べたとおり，書き込みの際に更新するのは，data bitmap， inode， data block の 3 箇所である．3 箇所の内， 1 箇所のみ，または 2 箇所の更新が終わった時点で，障害が発生した場合を説明する．
+\begin{description}
+	\item[data block Db のみ書き込みが完了した場合]\mbox{}\\
+　この場合，データは disk に書き込まれているが， inode はそのブロックを指し示していない．さらに， data bitmap を見ても，そのブロックが使用されていないと表示されている．これは，書き込み操作が行われなかった場合とほぼ同じであるため，問題がないと言える．
+	\item[inode I[v2] のみ書き込みが完了した場合]\\
+	\item[data bitmap B[v2] のみ書き込みが完了した場合]\\
+	\item[inode I[v2] と data bitmap B[v2] のみ書き込みが完了した場合]\\
+	\item[inode I[v2] と data block Db のみ書き込みが完了した場合]\\
+	\item[data bitmap B[v2] と data block Db のみ書き込みが完了した場合]\\
+\end{description}
 \subsection{journaling の手順}
 
 \clearpage
