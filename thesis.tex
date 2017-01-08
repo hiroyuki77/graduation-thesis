@@ -57,7 +57,7 @@
 　近年，マルチテナント型のクラウドにコンテナ技術が利用されている．マルチテナント型のクラウドの例として， Amazon Web Services や Google Cloud Platform がある．こういったクラウドを管理する場合に， isolation が重要である．ここで，isolation と throttle との違いを明確にしておく．ディスクへの書き込みを 15\% に制限しているが， 30\% 必要としているプロセスと， 85\% に制限しているが 50\% しか必要としていないプロセスを実行したとする．throttle であれば，前者はディスクへの書き込みを 15\% ，後者は 50\% の割合で使う．一方， isolation では，余っている分を自由に利用できるので，後者が 50\% しか利用していないため，前者は必要としている 30\% 分を使うことができる．\\
 \begin{figure}[H]
 	\begin{center}
-		\includegraphics[width=5.0cm]{images/isolation.png}
+		\includegraphics[width=7.5cm]{images/isolation.png}
 		\caption{throttle と isolation との違い}
 		\label{fig:isolation}
 	\end{center}
@@ -78,12 +78,11 @@
 \label{sec:LXC}
 　近年，仮想化技術としてコンテナが注目されている．コンテナを実現する技術の一つに Linux コンテナ (LXC) がある．本章では， LXC の資源管理の仕組みについて説明をする．\\
 　LXC は，一つのマシン上にコンテナという隔離空間を作り出す．LXC は， Linux カーネル機能の一つである cgroup を使い，コンテナへの資源の割り当てを管理している．\\
-　cgroup は， OS が管理する資源を一元的に管理できる Linux カーネル機能である．cgroup は，プロセス，ファイルシステム， CPU ，メモリ， block I/O デバイスなどの各種デバイスといった多くのものを管理できる． cgroup はサブシステムによって，これら資源を管理している．
+　cgroup は， OS が管理する資源を一元的に管理できる Linux カーネル機能である．cgroup は，プロセス，ファイルシステム， CPU ，メモリ， block I/O デバイスなどの各種デバイスといった多種のものを管理できる． cgroup はサブシステムによって，これら資源を管理している．表\ref{tb:subsystem}に， cgroup のサブシステムとその機能を示す．\\
 \begin{table}[htb]
-	\caption{cgroup のサブシステムとその機能}
-	\label{tb:subsystem}
 	\begin{center}
-		\begin{tabular}{|c||c|} \hline
+		\caption{cgroup のサブシステムとその機能}
+		\begin{tabular}{|c||l|} \hline
 			サブシステム名 & 機能\\
 			\hline \hline
 			blkio & ブロックデバイスへの入出力アクセスの制限を設定する\\
@@ -109,21 +108,50 @@
 			pids & 起動するプロセス数を制限する\\
 			\hline
 		\end{tabular}
+		\label{tb:subsystem}
 	\end{center}
 \end{table}
-　cgroup は資源のグループ化を行い，グループごとに資源利用の優先度を決めたり，利用できる資源を制限したりしている．さらに，グループを隔離することで，他のグループから中が見えないようにしている．
+　cgroup は資源のグループ化を行い，グループごとに資源利用の優先度を決めたり，利用できる資源を制限したりしている．さらに，グループを隔離することで，他のグループから中が見えないようにしている．これによって，コンテナという隔離空間を作り出している．したがって，図\ref{fig:grouping}のように，あるコンテナから他のコンテナの内部へはアクセスが出来ない．
 \begin{figure}[H]
 	\begin{center}
-		\includegraphics[width=10.0cm, clip]{images/cgroup.pdf}
+		\includegraphics[width=5.0cm, clip]{images/kakuri.pdf}
 		\caption{cgroup によるグループ化}
 		\label{fig:grouping}
 	\end{center}
 \end{figure}
+　より詳しく見ていくために， blkio サブシステムについて説明する。blkio サブシステムは， cgroup 内のタスクが行う，ブロックデバイス上の I/O アクセスを管理します．制御の方法は，重み付け比例配分という方法と， I/O スロットリングという方法の２種類があります．I/O スロットリングは，特定のデバイスへの I/O 操作数の上限を設定するのに使います．重み付け比例配分は， Completely Fair Queuing スケジューラによりスケジューリングを行うことで，グループに重み付けをすることができる．この重み付けは， 100 ~ 1000 の間で指定できる．\\
+　例えば，２つのグループがあり，これらをグループ A とグループ B とする．グループ A とグループ B のブロックデバイスへの I/O アクセスを 2 : 1 に重み付けしたい場合， グループ A に対応する blkio サブシステム以下の blkio.weight の値を 1000 に設定し，グループ B に対応する blkio サブシステム以下の blkio.weight の値を 500 に設定する．これによって， 1000 : 500 、つまり 2 : 1 で重み付けをすることができる．
 　
 \clearpage
 \section{journaling file system}
 \label{sec:journaling}
+　唐突な電源断が発生したり， OS にバグが発生したりすると， file system の一貫性が失われてしまう．この問題を crash-consistency problem という．本来，保存してあるデータは永続的なものであるべきである．そこで，この問題を解決するために生み出されたものが， journaling file system である．本章では， ext4 file system において，デフォルトで用いられている， metadata journaling について説明する．
 \subsection{journaling の意味}
+　本来，データは永続的なものであるべきである。しかし，データを変更する途中で，電源断が発生したり OS にバグが発生したりして，変更が中断されてしまう場合が存在する．この場合，復帰する際に特別な操作を行わないと， file system に矛盾が生じてしまう．簡単な書き込みを例に，途中でクラッシュが起こってしまった場合にどうなるかを紹介する．書き込み例は，すでに存在するファイルに対して，データブロックを一つ加えるもので，ファイルを開く，正しいオフセットの位置まで移動する， 4KB の write を発行する，ファイルを閉じるの 4 つの操作からなる．\\
+　書き込み対象の file system も標準的な， inode bitmap, data bitmap, inodes, data blocks を含んでいるものとする．初期状態を図\ref{fig:data1}に示す．
+\begin{figure}[H]
+	\begin{center}
+		\includegraphics[width=2.0cm]{images/isolation.png}
+		\caption{初期状態}
+		\label{fig:data1}
+	\end{center}
+\end{figure}
+　また， inode の中身は以下のようになっているとする．
+\begin{table}[htb]
+	\begin{center}
+%	\caption{inode の初期状態}
+		\begin{tabular}{lcl}
+			owner & : & hoge \\
+			permissions & : & read-write \\
+			size & : & 1 \\
+			pointer & : & 4 \\
+			pointer & : & null \\
+			pointer & : & null \\
+			pointer & : & null
+		\end{tabular}
+		\label{tab:inode1}
+	\end{center}
+\end{table}	
 \subsection{journaling の手順}
 
 \clearpage
