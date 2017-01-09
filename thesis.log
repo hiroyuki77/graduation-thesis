@@ -1,4 +1,4 @@
-This is e-pTeX, Version 3.14159265-p3.6-141210-2.6 (utf8.euc) (TeX Live 2015/Debian) (preloaded format=platex 2017.1.6)  8 JAN 2017 17:17
+This is e-pTeX, Version 3.14159265-p3.6-141210-2.6 (utf8.euc) (TeX Live 2015/Debian) (preloaded format=platex 2017.1.6)  9 JAN 2017 17:37
 entering extended mode
  restricted \write18 enabled.
  %&-line parsing enabled.
@@ -525,34 +525,60 @@ LaTeX Warning: `h' float specifier changed to `ht'.
 
 [5
 
-] [6] [7] [8
+]
+LaTeX Font Info:    Try loading font information for OMS+txr on input line 182.
 
-] [9
+ (/usr/share/texlive/texmf-dist/tex/latex/txfonts/omstxr.fd
+File: omstxr.fd 2000/12/15 v3.1
+)
+LaTeX Font Info:    Font shape `OMS/txr/m/n' in size <10> not available
+(Font)              Font shape `OMS/txsy/m/n' tried instead on input line 182.
+File: images/data3.pdf Graphic file (type pdf)
 
-] [10
+<images/data3.pdf> [6]
+File: images/data4.pdf Graphic file (type pdf)
+ <images/data4.pdf>
+File: images/data5.pdf Graphic file (type pdf)
+ <images/data5.pdf> [7]
+File: images/data6.pdf Graphic file (type pdf)
+
+<images/data6.pdf>
+File: images/data7.pdf Graphic file (type pdf)
+ <images/data7.pdf> [8]
+File: images/data8.pdf Graphic file (type pdf)
+ <images/data8.pdf>
+File: images/ext2.pdf Graphic file (type pdf)
+ <images/ext2.pdf>
+[9]
+File: images/ext3.pdf Graphic file (type pdf)
+ <images/ext3.pdf> [10] [11
+
+] [12
+
+] [13
 
 ]
-Package atveryend Info: Empty hook `BeforeClearDocument' on input line 203.
- [11
+Package atveryend Info: Empty hook `BeforeClearDocument' on input line 276.
+ [14
 
 ]
-Package atveryend Info: Empty hook `AfterLastShipout' on input line 203.
+Package atveryend Info: Empty hook `AfterLastShipout' on input line 276.
  (./thesis.aux)
-Package atveryend Info: Empty hook `AtVeryEndDocument' on input line 203.
-Package atveryend Info: Empty hook `AtEndAfterFileList' on input line 203.
+Package atveryend Info: Empty hook `AtVeryEndDocument' on input line 276.
+Package atveryend Info: Empty hook `AtEndAfterFileList' on input line 276.
 
 
 LaTeX Warning: There were undefined references.
 
-Package atveryend Info: Empty hook `AtVeryVeryEnd' on input line 203.
+Package atveryend Info: Empty hook `AtVeryVeryEnd' on input line 276.
  ) 
 Here is how much of TeX's memory you used:
- 7053 strings out of 494865
- 101844 string characters out of 6179770
- 181037 words of memory out of 5000000
- 10375 multiletter control sequences out of 15000+600000
+ 7101 strings out of 494865
+ 102695 string characters out of 6179770
+ 181499 words of memory out of 5000000
+ 10415 multiletter control sequences out of 15000+600000
  24625 words of font info for 88 fonts, out of 8000000 for 9000
  269 hyphenation exceptions out of 8191
- 29i,10n,32p,1057b,381s stack positions out of 5000i,500n,10000p,200000b,80000s
+ 29i,10n,32p,1057b,432s stack positions out of 5000i,500n,10000p,200000b,80000s
 
-Output written on thesis.dvi (12 pages, 28452 bytes).
+Output written on thesis.dvi (15 pages, 40236 bytes).

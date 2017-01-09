@@ -178,16 +178,84 @@
 	\end{center}
 \end{figure}
 　上記で述べたとおり，書き込みの際に更新するのは，data bitmap， inode， data block の 3 箇所である．3 箇所の内， 1 箇所のみ，または 2 箇所の更新が終わった時点で，障害が発生した場合を説明する．
-\begin{description}
-	\item[data block Db のみ書き込みが完了した場合]\mbox{}\\
-　この場合，データは disk に書き込まれているが， inode はそのブロックを指し示していない．さらに， data bitmap を見ても，そのブロックが使用されていないと表示されている．これは，書き込み操作が行われなかった場合とほぼ同じであるため，問題がないと言える．
-	\item[inode I[v2] のみ書き込みが完了した場合]\\
-	\item[data bitmap B[v2] のみ書き込みが完了した場合]\\
-	\item[inode I[v2] と data bitmap B[v2] のみ書き込みが完了した場合]\\
-	\item[inode I[v2] と data block Db のみ書き込みが完了した場合]\\
-	\item[data bitmap B[v2] と data block Db のみ書き込みが完了した場合]\\
-\end{description}
+\begin{itemize}
+	\item{data block Db のみ書き込みが完了した場合}\mbox{}\\
+　この場合，データは disk に書き込まれているが， inode はそのブロックを指し示していない．さらに， data bitmap を見ても，そのブロックが使用されていないと表示されている．これは，書き込み操作が行われなかった場合とほぼ同じであるため，問題がないと言える．\\
+\begin{figure}[H]
+	\begin{center}
+		\includegraphics[width=15.0cm,clip]{images/data3.pdf}
+		\caption{data block Db のみ書き込んだ場合}
+		\label{fig:data3}
+	\end{center}
+\end{figure}
+	\item{inode I[v2] のみ書き込みが完了した場合}\\
+　この場合，data block Db の中身が書き込まれていないにもかかわらず， inode I[v2] の pointer は data block Db を指している状態になる．そのため， garbage data を読んでしまう可能性が存在する．さらに， inode I[v2] の pointer は data block Db を指しているが， data bitmap は，data block Db が使われていない状態であることを示している．つまり， file system の一貫性が崩れた状態となり，問題があると言える．\\
+\begin{figure}[H]
+	\begin{center}
+		\includegraphics[width=15.0cm,clip]{images/data4.pdf}
+		\caption{inode I[v2] のみ書き込んだ場合}
+		\label{fig:data4}
+	\end{center}
+\end{figure}
+	\item{data bitmap B[v2] のみ書き込みが完了した場合}\\
+　この場合， data bitmap B[v2] は， data block Db が使用中であると示しているが，どの inode も data block Db を指していない．したがって，この場合も file system の一貫性が崩れた状態となり，さらに，data block Db が全く使えない状態に陥ってしまう．よって，問題があると言える．\\
+\begin{figure}[H]
+	\begin{center}
+		\includegraphics[width=15.0cm,clip]{images/data5.pdf}
+		\caption{data bitmap B[v2] のみ書き込んだ場合}
+		\label{fig:data5}
+	\end{center}
+\end{figure}
+	\item{inode I[v2] と data bitmap B[v2] のみ書き込みが完了した場合}\\
+　この場合， data bitmap B[v2] は， data block Db が使用中であることを示し， inode I[v2] はそのブロックを指している．よって，メタデータの一貫性は保たれている．しかし， data block Db の中身は書き込まれていないため， garbage data を読んでしまう可能性がある．したがって，問題があると言える．\\
+\begin{figure}[H]
+	\begin{center}
+		\includegraphics[width=15.0cm,clip]{images/data6.pdf}
+		\caption{inode I[v2] と data bitmap B[v2] のみ書き込んだ場合}
+		\label{fig:data6}
+	\end{center}
+\end{figure}
+	\item{inode I[v2] と data block Db のみ書き込みが完了した場合}\\
+　この場合， inode I[v2] の pointer は data block Db を指しており，中身も書き込まれているが， data bitmap B[v2] は data block Db が使用されていないと示している．これは， file system の一貫性が崩れた状態であり，問題があると言える．\\ 
+\begin{figure}[H]
+	\begin{center}
+		\includegraphics[width=15.0cm,clip]{images/data7.pdf}
+		\caption{inode I[v2] と data block Db のみ書き込んだ場合}
+		\label{fig:data7}
+	\end{center}
+\end{figure}
+	\item{data bitmap B[v2] と data block Db のみ書き込みが完了した場合}\\
+　この場合でも， inode I[v2] と data bitmap B[v2] との間に矛盾が生じているため， file system の一貫性が崩れている．	data block Db は使用されている状態にあり，中身も書き込まれているが，どのファイルに属すブロックかわからない．したがって，問題があると言える．\\
+\begin{figure}[H]
+	\begin{center}
+		\includegraphics[width=15.0cm,clip]{images/data8.pdf}
+		\caption{data bitmap B[v2] と data block Db のみ書き込んだ場合}
+		\label{fig:data8}
+	\end{center}
+\end{figure}
+\end{itemize}
+　これらのクラッシュが起こった状況から見られるように，一部のブロックが使えなくなる状況が発生したり， garbage data をユーザに返してしまう状況が発生したりする．クラッシュが発生し，復帰したあとでも， file system に一貫性が保たれている状態にしたい．一方で， disk に対して一度に一つの write しか commit できないという制限がある．その制限の中で，クラッシュ後も file system が一貫性を保った状態で復帰できるようにするのが， journaling である．\\
 \subsection{journaling の手順}
+　journaling は， write ahead logging とも呼ばれる．disk の内容を更新する時に，これから実行しようとしていることをメモとして書いておく．これが ``write ahead'' の部分である．このようにすることで，データ構造の更新中にクラッシュが起きても，復帰時にメモしてあるものを見て，どういった操作をすればいいかわかるとともに，操作をやり直すことができる．また，クラッシュから復帰した際に，file system の一貫性が崩れていないか，ファイルを一つ一つ調べる必要がない．結果として，クラッシュ後の復帰時にメモを見るという少しの作業しかしなくても済むのである．\\
+　journaling を使っていない ext2 file system と journaling を使っている ext3 file system を比較する．ext2 file system を見てみる．disk は一つの superblock と複数の block group に分けられている．さらに， block group は， inode bitmap， data bitmap， inode， data block からなる．superblock は file system の管理情報を記録する領域である．ext2 file system の構造は，図\ref{fig:ext2}のようである．\\
+\begin{figure}[H]
+	\begin{center}
+		\includegraphics[width=15.0cm,clip]{images/ext2.pdf}
+		\caption{ext2 file system の構造}
+		\label{fig:ext2}
+	\end{center}
+\end{figure}
+　ext3 file system は， ext2 file system に journaling 機能を足したものである．journaling 機能を満たすため，先ほど述べたメモを取るような領域を確保しておかなければならない．ext3 file system の構造は，図\ref{fig:ext3}のようである．\\
+　\begin{figure}[H]
+	\begin{center}
+		\includegraphics[width=15.0cm,clip]{images/ext3.pdf}
+		\caption{ext3 file system の構造}
+		\label{fig:ext3}
+	\end{center}
+\end{figure}
+　journaling には， data journaling と metadata journaling が存在する．data journaling は，メタデータと実データの両方を journaling の対象にするものであり，信頼性を重視している．一方で， metadata journaling は，メタデータのみを journaling の対象にするものであり，書き込みの速度を重視している．ここでは， metadata journaling を説明する．\\
+　すべてのデータを journaling の対象とすると，それらの書き込みを 2 回ずつ行わなければ行けないため，高いコストが必要になる．そこで，実データは journal に書き込まず，メタデータのみを journaling の対象とした metadata journaling が利用される．これは， ordered journaling とも呼ばれる．\\
+　先ほどのクラッシュが起こった際の例で扱った簡単な書き込みを使って， metadata journaling の手順を説明する．最初に，実際に書き込みを行う前に journal に書き込まれるものは，図\ref{fig:metaj}のようになっている．
 
 \clearpage
 \section{Linux コンテナに対する DDoS 攻撃}
