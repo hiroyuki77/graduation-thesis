@@ -255,7 +255,41 @@
 \end{figure}
 　journaling には， data journaling と metadata journaling が存在する．data journaling は，メタデータと実データの両方を journaling の対象にするものであり，信頼性を重視している．一方で， metadata journaling は，メタデータのみを journaling の対象にするものであり，書き込みの速度を重視している．ここでは， metadata journaling を説明する．\\
 　すべてのデータを journaling の対象とすると，それらの書き込みを 2 回ずつ行わなければ行けないため，高いコストが必要になる．そこで，実データは journal に書き込まず，メタデータのみを journaling の対象とした metadata journaling が利用される．これは， ordered journaling とも呼ばれる．\\
-　先ほどのクラッシュが起こった際の例で扱った簡単な書き込みを使って， metadata journaling の手順を説明する．最初に，実際に書き込みを行う前に journal に書き込まれるものは，図\ref{fig:metaj}のようになっている．
+　先ほどのクラッシュが起こった際の例で扱った簡単な書き込みを使って， metadata journaling の手順を説明する．最初に，実際に書き込みを行う前に journal に書き込まれるものは，図\ref{fig:metaj}のようになっている．また， TxB は， トランザクションの始まりを意味しており， TxE は，トランザクションの終わりを意味している．
+\begin{figure}[H]
+	\begin{center}
+		\includegraphics[width=15.0cm,clip]{images/journalLog.pdf}
+		\caption{journal log の中身}
+		\label{fig:metaj}
+	\end{center}
+\end{figure}
+　書き込み操作によって行われる更新は， inode I[v2]， data bitmap B[v2]， data block Db の 3 つから構成されている．この内，最初の 2 つがメタデータにあたる．したがって， journal に記録され，記録が無事終わったあとで file system に書き込みが行われる．それに対し，最後の一つは実データである．したがって， file system に一度だけ書き込みが行われるのみである．\\
+　ここで，書き込みの順序を考える．例えば，メタデータである inode I[v2] と data bitmap B[v2] の書き込みを行ったあとに， data block Db の書き込みを行うとする．この場合， もし書き込み途中で OS のクラッシュなどが発生して書き込みが中断されてしまうと， file system の一貫性は保たれているが， inode I[v2] は， garbage data を指してしまう状況が生まれる．これは，中断が発生して復帰した時， inode I[v2] と data bitmap B[v2] は書き込みがもう一度行われるのに対し， data block Db は journaling の対象にしていないため，書き込みのやり直しが発生しないからだ．\\
+　この状況が発生しないようにするため，多くの場合，実データを書き込んでから，それに関連するメタデータの書き込みを行う．よって，metadata journaling の手順は以下のようになる．\\
+\begin{enumerate}
+	\item{Data write}\\
+	　最終的に実データを書き込む場所に，実データの書き込みを行う．\\
+	　書き込みの終了を待つ．
+	\item{Journal metadata write}\\
+	　TxB block とメタデータを journal log に書き込む．\\
+	　書き込みの終了を待つ．
+	\item{Journal commit}\\
+	　TxE block を journal log に書き込む．\\
+	　書き込むの終了を待つ．\\
+	　トランザクションがコミットされる．
+	\item{Checkpoint metadata}\\
+	　最終的にメタデータを書き込み場所に，メタデータの書き込みを行う．\\
+	\item{Free}\\
+	　journal log のトランザクションを書き込んだスペースを解放する．\\
+\end{enumerate}
+　さらに， metadata journaling のタイムラインを図\ref{fig:timeline}に示す．各列が，いずれかの要素の write が発行された，あるいは write が完了した論理時間を示している．\\
+\begin{figure}
+	\begin{center}
+		\includegraphics[width=10.0cm,clip]{images/timeline.pdf}
+		\caption{metadata journaling timeline}
+		\label{fig:timeline}
+	\end{center}
+\end{figure}
 
 \clearpage
 \section{Linux コンテナに対する DDoS 攻撃}
