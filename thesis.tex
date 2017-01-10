@@ -234,8 +234,9 @@
 	\end{center}
 \end{figure}
 \end{itemize}
-　これらのクラッシュが起こった状況から見られるように，一部のブロックが使えなくなる状況が発生したり， garbage data をユーザに返してしまう状況が発生したりする．クラッシュが発生し，復帰したあとでも， file system に一貫性が保たれている状態にしたい．一方で， disk に対して一度に一つの write しか commit できないという制限がある．その制限の中で，クラッシュ後も file system が一貫性を保った状態で復帰できるようにするのが， journaling である．\\
+　これらのクラッシュが起こった状況から見られるように，一部のブロックが使えなくなる状況が発生したり， garbage data をユーザに返してしまう状況が発生したりする．クラッシュが発生し，復帰したあとでも， file system に一貫性が保たれている状態にしたい．一方で， disk に対して一度に一つの write しか commit できないという制限がある．その制限の中で，クラッシュ後も file system が一貫性を保った状態で復帰できるようにするため， file system checker が生まれ，その後にそれを改良した journaling が生まれた．\\
 \subsection{journaling の手順}
+%　まず，先に生まれた file system checker がどういった処理を行うか説明する．その後， journaling がどういった処理をするか説明する．\\
 　journaling は， write ahead logging とも呼ばれる．disk の内容を更新する時に，これから実行しようとしていることをメモとして書いておく．これが ``write ahead'' の部分である．このようにすることで，データ構造の更新中にクラッシュが起きても，復帰時にメモしてあるものを見て，どういった操作をすればいいかわかるとともに，操作をやり直すことができる．また，クラッシュから復帰した際に，file system の一貫性が崩れていないか，ファイルを一つ一つ調べる必要がない．結果として，クラッシュ後の復帰時にメモを見るという少しの作業しかしなくても済むのである．\\
 　journaling を使っていない ext2 file system と journaling を使っている ext3 file system を比較する．ext2 file system を見てみる．disk は一つの superblock と複数の block group に分けられている．さらに， block group は， inode bitmap， data bitmap， inode， data block からなる．superblock は file system の管理情報を記録する領域である．ext2 file system の構造は，図\ref{fig:ext2}のようである．\\
 \begin{figure}[H]
@@ -285,11 +286,22 @@
 　さらに， metadata journaling のタイムラインを図\ref{fig:timeline}に示す．各列が，いずれかの要素の write が発行された，あるいは write が完了した論理時間を示している．\\
 \begin{figure}
 	\begin{center}
-		\includegraphics[width=10.0cm,clip]{images/timeline.pdf}
+		\includegraphics[width=12.0cm,clip]{images/timeline.pdf}
 		\caption{metadata journaling timeline}
 		\label{fig:timeline}
 	\end{center}
 \end{figure}
+　では， metadata journaling の各手順中にクラッシュなどによって中断され，その後に復帰する場合を考える．\\
+\begin{itemize}
+	\item{Data write が中断された場合}\\
+	復帰後に， journal を見ても何も log が残っていないため，書き込み自体がなかったことになる．したがって， file system の一貫性は保たれた状態である．\\
+	\item{Journal metadata write が中断された場合}\\
+	復帰後に， journal を見ると途中まで書かれているが，トランザクションの終了を表す TxE が書き込まれていないため，実データはすでに書き込まれているが，書き込み自体はなかったことになる．したがって， file system の一貫性は保たれた状態である．\\
+	\item{Journal commit が中断された場合}\\
+	この場合， Journal metadata write が中断された場合と同様であるため， file system の一貫性は保たれた状態である．\\
+	\item{Checkpoint metadata が中断された場合}\\
+	復帰後に， journal を見ると，トランザクションが残っている．そこで，最終的にメタデータを書き込む場所へのメタデータの書き込みを再実行することができる．その結果，書き込みは完了される．したがって， file system の一貫性は保たれた状態である．\\
+\end{itemize}
 
 \clearpage
 \section{Linux コンテナに対する DDoS 攻撃}
