@@ -111,7 +111,14 @@
 		\label{tb:subsystem}
 	\end{center}
 \end{table}
-　cgroup は資源のグループ化を行い，グループごとに資源利用の優先度を決めたり，利用できる資源を制限したりしている．さらに，グループを隔離することで，他のグループから中が見えないようにしている．これによって，コンテナという隔離空間を作り出している．したがって，図\ref{fig:grouping}のように，あるコンテナから他のコンテナの内部へはアクセスが出来ない．
+\begin{figure}[H]
+	\begin{center}
+		\includegraphics[width=10.0cm, clip]{images/container.pdf}
+		\caption{LXC における資源管理の例}
+		\label{fig:grouping}
+	\end{center}
+\end{figure}
+　cgroup は資源のグループ化を行い，グループごとに資源利用の優先度を決めたり，利用できる資源を制限したりしている．さらに，グループを隔離することで，他のグループから中が見えないようにしている．これによって，コンテナという隔離空間を作り出している．したがって，図\ref{fig:grouping}のように，あるコンテナから他のコンテナの内部へはアクセスが出来ない．\\
 \begin{figure}[H]
 	\begin{center}
 		\includegraphics[width=5.0cm, clip]{images/kakuri.pdf}
@@ -119,8 +126,9 @@
 		\label{fig:grouping}
 	\end{center}
 \end{figure}
-　より詳しく見ていくために， blkio サブシステムについて説明する。blkio サブシステムは， cgroup 内のタスクが行う，ブロックデバイス上の I/O アクセスを管理します．制御の方法は，重み付け比例配分という方法と， I/O スロットリングという方法の２種類があります．I/O スロットリングは，特定のデバイスへの I/O 操作数の上限を設定するのに使います．重み付け比例配分は， Completely Fair Queuing スケジューラによりスケジューリングを行うことで，グループに重み付けをすることができる．この重み付けは， 100 ~ 1000 の間で指定できる．\\
-　例えば，２つのグループがあり，これらをグループ A とグループ B とする．グループ A とグループ B のブロックデバイスへの I/O アクセスを 2 : 1 に重み付けしたい場合， グループ A に対応する blkio サブシステム以下の blkio.weight の値を 1000 に設定し，グループ B に対応する blkio サブシステム以下の blkio.weight の値を 500 に設定する．これによって， 1000 : 500 、つまり 2 : 1 で重み付けをすることができる．
+　より詳しく見ていくために， blkio サブシステムについて説明する。blkio サブシステムは， cgroup 内のタスクが行う，ブロックデバイス上の I/O アクセスを管理しする．制御の方法は，重み付け比例配分という方法と， I/O スロットリングという方法の２種類があります．I/O スロットリングは，特定のデバイスへの I/O 操作数の上限を設定するのに使います．重み付け比例配分は， Completely Fair Queuing スケジューラによりスケジューリングを行うことで，グループに重み付けをすることができる．この重み付けは， 100 ~ 1000 の間で指定できる．\\
+　例えば，コンテナが２つある状況を考える．一方のコンテナのブロックデバイスへの I/O アクセスの重み付けを 850 に指定する．さらに，もう一方のコンテナの重み付けを 150 に指定する．これによって，片方のコンテナは，ブロックデバイスへの I/O アクセスを 85\% に制限され，もう一方は 15\% に制限されたことになる．ここで，両コンテナ上で Flexible I/O (FIO) benchmark を実行すると，図\{-----\}のようになる．また， FIO の設定は次のようになっている．workload の種類は sequential write である．キャッシュを使わないようにするため， Direct I/O で実行する．
+　最後に， LXD について説明をする．LXD は LXC を操作するための REST API を提供するデーモンである．LXC は，コンテナの作成と管理を行うにあたって，十分な機能を持っているが，ユーザフレンドリではない．なぜなら， LXC のツールが何を行い，どのように動作するか，理解しておくべき知識が多くあるからだ．LXD では，こういった問題を解決し，動的なリソース制約やコンテナのマイグレーションなどの LXC では存在していた制約を解決することができると考えられている．
 　
 \clearpage
 \section{journaling file system}
@@ -286,7 +294,7 @@
 　さらに， metadata journaling のタイムラインを図\ref{fig:timeline}に示す．各列が，いずれかの要素の write が発行された，あるいは write が完了した論理時間を示している．\\
 \begin{figure}
 	\begin{center}
-		\includegraphics[width=12.0cm,clip]{images/timeline.pdf}
+		\includegraphics[width=13.0cm,clip]{images/timeline.pdf}
 		\caption{metadata journaling timeline}
 		\label{fig:timeline}
 	\end{center}
@@ -302,10 +310,21 @@
 	\item{Checkpoint metadata が中断された場合}\\
 	復帰後に， journal を見ると，トランザクションが残っている．そこで，最終的にメタデータを書き込む場所へのメタデータの書き込みを再実行することができる．その結果，書き込みは完了される．したがって， file system の一貫性は保たれた状態である．\\
 \end{itemize}
+　Linux では，このような journaling 機能を備えた ext4 file system を採用している．さらに LXC は，コンテナ間で file system を共有しているため，複数のコンテナからの I/O リクエストを一つの journal でシリアライズし，順番に処理を行う必要がある．
 
 \clearpage
 \section{Linux コンテナに対する DDoS 攻撃}
 \label{sec:DDoS}
+　第\ref{sec:LXC}章において， LXC が Linux カーネル機能の一つである cgroup を利用して，コンテナ間の isolation を保っていることを説明した．しかし， cgroup による isolation は不完全なものである．本章では，コンテナ上で，あるプロセスを実行することによって，コンテナ間の isolation が保たれなくなることを示す．\\
+\subsection{実験環境}
+　今回の実験環境とその準備手順について説明する．ホストマシンには，\{-----\}を使用する．使用する OS は， Ubuntu 16.04.1 Server 64bit Linux distribution で，カーネルのバージョンは，\{-----\}である． file system には， ext4 file system を使い， journaling mode は，初期設定の状態である， metadata のみ journaling の対象とする ordered journaling とする．正確に性能を記録できるようにするため， LVM を使わないで OS のインストールを行う．コンテナの disk へのアクセスの制限は， cgroup によって行い， Linux コンテナには， LXD 2.7 を使用する．\\
+　LXD を用いて， ubuntu 16.04.1 のイメージから 2 つコンテナを作成する．このコンテナをそれぞれコンテナ A ，コンテナ B とする．cgroup の blkio サブシステムによって，両コンテナの disk へのアクセスに対して，制限をかける．コンテナ A は 85\% に制限し，コンテナ B は 15\% に制限する．cgroup の制限を有効にするため，スケジューラを Complete Fair Queuing (CFQ) スケジューラに設定する．コンテナ A では，攻撃対象に設定したプログラムを動かし，コンテナ B では，悪意のあるコンテナとして，攻撃プログラムを実行する．\\
+
+\subsection{DDoS 攻撃}
+　LXC における cgroup による isolation は不完全なものである．それによって，一つのコンテナから他のコンテナに対して，攻撃ができてしまうことを示す．\\
+　disk へのアクセスを 85\% に制限した，攻撃対象のコンテナ A では， Flexible I/O (FIO) benchmark を実行する． FIO benchmark の設定は次のようになっている．workload の種類は sequential write である．キャッシュを使わないように Direct I/O で実行する．\\
+　disk へのアクセスを 15\% に制限した，攻撃側のコンテナ B では， FIO benchmark を実行する． FIO benchmark の設定は次のようになっている． workload の種類は sequential write である．キャッシュを使わないように Direct I/O で実行する．100 命令に 1 回 fsync を行う．\\
+　結果を図\{-----\}に示す．
 
 \clearpage
 \section{コンテナにおける資源管理の脆弱性解析}
