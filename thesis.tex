@@ -118,7 +118,7 @@
 		\label{fig:grouping}
 	\end{center}
 \end{figure}
-　cgroup のグループを管理する方法は，おもに 5 つある．それは， cgroup ファイルシステムのマウント， cgroup の作成，プロセスの登録，プロセスの移動， cgroup の削除の 5 つである．
+　cgroup のグループを管理するための操作は，おもに 5 つある．それは， cgroup ファイルシステムのマウント， cgroup の作成，プロセスの登録，プロセスの移動， cgroup の削除の 5 つである．
 \begin{itemize}
 	\item{cgroup ファイルシステムのマウント}\\
 	cgroup は， /sys/fs/cgroup 以下にマウントされる．ここに，サブシステム名のディレクトリを作成する．すると，自動的に cgroup の使用状況を見たり， cgroup をコントロールしたりするためのファイルが作成される．例えば， /sys/fs/cgroup/cpu というディレクトリを作成すると， cpu ディレクトリ内に cpu.stat ファイルや cpu.shares ファイルなどが自動作成される．\\
@@ -143,7 +143,7 @@
 　例えば，コンテナが２つある状況を考える．一方のコンテナのブロックデバイスへの I/O アクセスの重み付けを 850 に指定する．さらに，もう一方のコンテナの重み付けを 150 に指定する．これによって，片方のコンテナは，ブロックデバイスへの I/O アクセスを 85\% に制限され，もう一方は 15\% に制限されたことになる．ここで，両コンテナ上で Flexible I/O (FIO) benchmark を実行すると，図\ref{fig:blkio}のようになる．また， FIO の設定は次のようになっている．workload の種類は sequential write である．キャッシュを使わないようにするため， Direct I/O で実行する．\\
 \begin{figure}[H]
 	\begin{center}
-		\includegraphics[width=10.0cm]{images/fio_nofsync85.png}
+		\includegraphics[width=10.0cm]{images/FiguresForGraduation/fio_nofsync85.png}
 		\caption{cgroup によるブロックデバイスへの I/O アクセスの制限}
 		\label{fig:blkio}
 	\end{center}
@@ -335,7 +335,7 @@
 \clearpage
 \section{Linux コンテナに対する DDoS 攻撃}
 \label{sec:DDoS}
-　第\ref{sec:LXC}章において， LXC が Linux カーネル機能の一つである cgroup を利用して，コンテナ間の isolation を保っていることを説明した．しかし， cgroup による isolation は不完全なものである．本章では，コンテナ上で，あるプロセスを実行することによって，コンテナ間の isolation が保たれなくなることを示す．\\
+　第\ref{sec:LXC}章において， LXC が Linux カーネル機能の一つである cgroup を利用して，コンテナ間の isolation を保っていることを説明した．しかし， cgroup による isolation は不完全なものである．本章では，コンテナ上で，悪意のあるプロセスを実行することによって，コンテナ間の isolation が保たれなくなることを示す．\\
 \subsection{実験環境}
 　今回の実験環境とその準備手順について説明する．ホストマシンには，\{-----\}を使用する．使用する OS は， Ubuntu 16.04.1 Server 64bit Linux distribution で，カーネルのバージョンは，Linux 4.4.0-53-generic である． file system には， ext4 file system を使い， journaling mode は，初期設定の状態である， metadata のみ journaling の対象とする ordered journaling とする．正確に性能を記録できるようにするため， LVM を使わないで OS のインストールを行う．コンテナの disk へのアクセスの制限は， cgroup によって行い， Linux コンテナには， LXD 2.0.8 を使用する．\\
 　LXD を用いて， ubuntu 16.04.1 のイメージから 2 つコンテナを作成する．このコンテナをそれぞれコンテナ A ，コンテナ B とする．cgroup の blkio サブシステムによって，両コンテナの disk へのアクセスに対して，制限をかける．コンテナ A は 85\% に制限し，コンテナ B は 15\% に制限する．cgroup の制限を有効にするため，スケジューラを Complete Fair Queuing (CFQ) スケジューラに設定する．コンテナ A では，攻撃対象に設定したプログラムを動かし，コンテナ B では，悪意のあるコンテナとして，攻撃プログラムを実行する．\\
@@ -347,17 +347,53 @@
 　結果を図\ref{fig:fsync1}に示す．\\
 \begin{figure}[H]
 	\begin{center}
-		\includegraphics[width=10.0cm]{images/fio_fsync1.png}
+		\includegraphics[width=10.0cm]{images/FiguresForGraduation/fio_fsync1.png}
 		\caption{攻撃側が fsync を行った場合の FIO の disk I/O 使用率}
 		\label{fig:fsync1}
 	\end{center}
 \end{figure}
 　攻撃対象となる FIO は、 cgroup によって disk へのアクセスを 85\% に制限したため， 85\% のパフォーマンスを示すはずである．しかし，図\ref{fig:fsync1}を見ると， 15\% しか使えていない．したがって，攻撃側のコンテナから攻撃対象となるコンテナに対して，攻撃ができていることがわかる．\\
+　マルチテナント型のコンテナにおいて， FIO が利用されることは少ない．一方で，実際に利用されるものとして， MySQL と varmail が挙げられる．以降では， MySQL と varmail に対しても，同様に， cgroup による isolation が不完全なことによって，他のコンテナから攻撃ができることを示す．\\
+\subsubsection{MySQL に対する DDoS 攻撃}
+　まず，攻撃対象と攻撃側で実行するものについて説明する．攻撃対象とするのは MySQL である．MySQL を攻撃対象するため， MySQL を対象のコンテナにインストールする．バージョンは， 5.7.16 である．ストレージエンジンには， innoDB を用いる．MySQL のベンチマークには， sysbench を用いる．sysbench のバージョンは sysbench 1.0 である．トランザクションは autocommit されるので， non-transactional mode を使う．ワークロードは， INSERT 命令を 10 個のデータベーステーブルに対し，発行し続けるものである．そのため， test ファイルには， sysbench 側に用意してある insert.lua ファイルを利用する．このワークロードを，攻撃対象とするコンテナ内で実行する．\\
+　攻撃側のコンテナでは，ひたすらにファイルのメタデータを更新する．中身のないテスト用のファイルを 1000 個用意する．これらのファイルの内，一つのファイルのパーミッションを変える操作を一回行うごとに， fsync を行う．この，ファイルのメタデータを変更し，更新するという操作を繰り返す．この時， fsync の頻度は， 7.47 times/s である．\\
+　以上のように，攻撃対象のコンテナでは MySQL を実行し，攻撃側のコンテナではメタデータ更新攻撃を行う．結果を，図\ref{fig:mysql-example}に示す．\\
+\begin{figure}[H]
+	\begin{center}
+		\includegraphics[width=10.0cm]{images/FiguresForGraduation/mysql_single1.png}
+		\caption{メタデータ更新攻撃時の MySQL の disk I/O 使用率}
+		\label{fig:mysql-example}
+	\end{center}
+\end{figure}
+　図\ref{fig:mysql-example}から，攻撃対象となる MySQL は，本来 85\% 分の disk I/O を使用できるはずであるが， 60\% しか使えていないことがわかる．よって，あるコンテナ上で，ファイルのメタデータをひたすらに更新する攻撃プログラムを実行すると，他のコンテナ上で動く MySQL に対して攻撃が出来ると言える．\\
+
+\subsubsection{varmail に対する DDoS 攻撃}
+　まず，攻撃対象と攻撃側で実行するものについて説明する．攻撃対象とするのは varmail である．varmail を攻撃対象とするため， varmail のベンチマークとして， filebench を使う．filebench のバージョンは， filebench 1.4.9.1 である．test 用のファイルとして， filebench 側で用意してある varmail.f ファイルを使う．これを，攻撃対象側のコンテナ内で実行する．\\
+　攻撃側のコンテナでは， MySQL の場合と同様のものを扱う．1000 個のファイルに対して，それらの内一つのファイルのパーミッションを変える操作を一回行うごとに， fsync を行う．この時， fsync の頻度は， 0.933 times/s である．
+　以上のように，攻撃対象のコンテナでは varmail を実行し，攻撃側のコンテナではメタデータ更新攻撃を行う．結果を，図\ref{fig:varmail-example}に示す．\\
+\begin{figure}[H]
+	\begin{center}
+		\includegraphics[width=10.0cm]{images/FiguresForGraduation/varmail_single1.png}
+		\caption{メタデータ更新攻撃時の varmail の disk I/O 使用率}
+		\label{fig:varmail-example}
+	\end{center}
+\end{figure}
+　図\ref{fig:varmail-example}から，攻撃対象となる varmail は，本来 85\% 分の disk I/O を使用できるはずであるが，それを満たしていないことがわかる．よって，あるコンテナ上で，ファイルのメタデータをひたすらに更新する攻撃プログラムを実行すると，他のコンテナ上で動く varmail に対して攻撃ができると言える．\\
+　以上から， MySQL と varmail の両者において，攻撃の対象とした場合に，攻撃が可能であることがわかる．次の第\ref{sec:analysis}章で，一つのコンテナで実行したものが，他のコンテナへ影響を与えてしまう脆弱性が発生することについて，解析を行う．\\
 
 \clearpage
 \section{コンテナにおける資源管理の脆弱性解析}
-　第\ref{sec:DDoS}章において， cgroup による isolation が不完全であることを示した．しかし， FIO benchmark が，実際のコンテナで利用されることは少ない．そこで本章では， cgroup による isolation が不完全なことによって，実際のコンテナで使われるものに対しても，他のコンテナから攻撃が出来，攻撃対象のパフォーマンスを下げることができることを示す．
 \label{sec:analysis}
+　第\ref{sec:DDoS}章において， cgroup による isolation が不完全であることを示すとともに， MySQL と varmail のような，実際のコンテナで使われるものに対しても，それを利用して攻撃ができることを示した．本章では，このような脆弱性が発生する原因について，攻撃手法を変えて複数の場合を比較しながら，結果の違いを比較し解析を行う．\\
+
+\subsection{MySQL のパフォーマンス比較}
+　MySQL を攻撃の対象とし，攻撃手法を変えたことによる disk I/O 使用率の変化を比較する．第\ref{sec:DDoS}章において，攻撃手法として， fsync を発行しファイルのメタデータを更新する方法を用いた．その際， fsync の頻度は 7.47 times/s であった．そこで， fsync の頻度を変えることで攻撃手法を変化させて，測定を行う．また，攻撃側のコンテナ上で，このメタデータ更新攻撃に加えて， FIO read benchmark を実行するというように攻撃手法を変えて，測定を行う．\\
+\subsubsection{fsync の頻度を変えた場合}
+　ファイルのメタデータ更新攻撃において，先程はファイルのパーミッションを変える操作を一回行うごとに， fsync を行っていたが， 10 回， 100 回， 1000 回行うごとに fsync の頻度を変えることで，攻撃手法を変える．また，その際の fsync の頻度はそれぞれ， 7.37 times/s， 4.50 times/s， 0.73 times/s である．\\
+　この結果を見ると， fsync の頻度を上げるほど， MySQL の disk I/O 使用率が下がっていることがわかる．
+　次に， fsync の頻度を上げるために，ファイルのパーミッションを変える操作を一回行うごとに fsync するメタデータ更新攻撃を，攻撃側のコンテナ上で，複数同時実行させる．
+
+\subsection{varmail のパフォーマンス比較}
 
 \clearpage
 \section{関連研究}
